@@ -1,38 +1,36 @@
-"""Categorize merchant names into household-spending categories via Claude."""
+"""Categorize merchant names into household-spending categories via Gemini."""
 
+import json
 from typing import List
 
-import anthropic
+from google import genai
+from google.genai import types
 
 from categories import CATEGORIES
-from config import ANTHROPIC_API_KEY, ANTHROPIC_MODEL
+from config import GEMINI_API_KEY, GEMINI_MODEL
 
 _client = None
 
 
-def _get_client() -> anthropic.Anthropic:
+def _get_client() -> genai.Client:
     global _client
     if _client is None:
-        _client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY or None)
+        _client = genai.Client(api_key=GEMINI_API_KEY or None)
     return _client
 
-_CATEGORIZE_TOOL = {
-    "name": "categorize_transactions",
-    "description": "Assign one household-spending category to each merchant, in the same order given.",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "categories": {
-                "type": "array",
-                "items": {"type": "string", "enum": CATEGORIES},
-                "description": "One category per input merchant, same order and length as the input list.",
-            }
-        },
-        "required": ["categories"],
-        "additionalProperties": False,
-    },
-    "strict": True,
-}
+
+_RESPONSE_SCHEMA = types.Schema(
+    type=types.Type.ARRAY,
+    items=types.Schema(type=types.Type.STRING, enum=CATEGORIES),
+)
+
+_SYSTEM_INSTRUCTION = (
+    "あなたは家計簿アプリのカテゴライズ担当です。"
+    "各利用店舗名を、次のカテゴリのいずれか一つに分類してください: "
+    f"{', '.join(CATEGORIES)}。"
+    "判断に迷う場合は「その他」を選んでください。"
+    "出力は入力と同じ順序・同じ件数のJSON配列にしてください。"
+)
 
 # Keep individual API calls small; a few hundred merchants per call stays
 # well under the model's output budget and keeps a single bad row from
@@ -52,22 +50,17 @@ def categorize_batch(merchant_names: List[str]) -> List[str]:
         chunk = merchant_names[start : start + _BATCH_SIZE]
         numbered = "\n".join(f"{i + 1}. {name}" for i, name in enumerate(chunk))
 
-        response = client.messages.create(
-            model=ANTHROPIC_MODEL,
-            max_tokens=4096,
-            system=(
-                "あなたは家計簿アプリのカテゴライズ担当です。"
-                "各利用店舗名を、次のカテゴリのいずれか一つに分類してください: "
-                f"{', '.join(CATEGORIES)}。"
-                "判断に迷う場合は「その他」を選んでください。"
+        response = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=numbered,
+            config=types.GenerateContentConfig(
+                system_instruction=_SYSTEM_INSTRUCTION,
+                response_mime_type="application/json",
+                response_schema=_RESPONSE_SCHEMA,
             ),
-            tools=[_CATEGORIZE_TOOL],
-            tool_choice={"type": "tool", "name": "categorize_transactions"},
-            messages=[{"role": "user", "content": numbered}],
         )
 
-        tool_use = next(b for b in response.content if b.type == "tool_use")
-        chunk_categories = tool_use.input["categories"]
+        chunk_categories = json.loads(response.text)
 
         if len(chunk_categories) != len(chunk):
             raise ValueError(

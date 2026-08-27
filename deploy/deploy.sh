@@ -5,7 +5,7 @@
 #   - gcloud CLI authenticated (`gcloud auth login`) with an active project set
 #   - APIs enabled: bigquery, cloudfunctions, cloudscheduler, cloudbuild, run
 #   - Secrets available as env vars in your shell before running this script:
-#       ANTHROPIC_API_KEY, MONEYFORWARD_EMAIL, MONEYFORWARD_PASSWORD
+#       GEMINI_API_KEY, MONEYFORWARD_EMAIL, MONEYFORWARD_PASSWORD
 #
 # Usage:
 #   PROJECT_ID=my-gcp-project REGION=asia-northeast1 ./deploy/deploy.sh
@@ -19,7 +19,7 @@ BQ_TABLE="${BQ_TABLE:-amex_transactions}"
 FUNCTION_NAME="${FUNCTION_NAME:-sync-amex-transactions}"
 SCHEDULER_JOB="${SCHEDULER_JOB:-sync-amex-transactions-daily}"
 
-: "${ANTHROPIC_API_KEY:?Set ANTHROPIC_API_KEY}"
+: "${GEMINI_API_KEY:?Set GEMINI_API_KEY}"
 : "${MONEYFORWARD_EMAIL:?Set MONEYFORWARD_EMAIL}"
 : "${MONEYFORWARD_PASSWORD:?Set MONEYFORWARD_PASSWORD}"
 
@@ -50,7 +50,7 @@ gcloud functions deploy "$FUNCTION_NAME" \
   --memory 256Mi \
   --timeout 300s \
   --set-env-vars "GCP_PROJECT_ID=$PROJECT_ID,BQ_DATASET=$BQ_DATASET,BQ_TABLE=$BQ_TABLE" \
-  --set-env-vars "ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY,MONEYFORWARD_EMAIL=$MONEYFORWARD_EMAIL,MONEYFORWARD_PASSWORD=$MONEYFORWARD_PASSWORD"
+  --set-env-vars "GEMINI_API_KEY=$GEMINI_API_KEY,MONEYFORWARD_EMAIL=$MONEYFORWARD_EMAIL,MONEYFORWARD_PASSWORD=$MONEYFORWARD_PASSWORD"
 
 FUNCTION_URL=$(gcloud functions describe "$FUNCTION_NAME" \
   --project "$PROJECT_ID" --region "$REGION" --gen2 \

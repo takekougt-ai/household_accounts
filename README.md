@@ -11,7 +11,7 @@ Amex CSV手動DL（過去24ヶ月） → import_csv.py → BigQuery
 
 【継続データ取得（自動・毎日）】
 MoneyForward ME → fetch_moneyforward.py
-  → categorize.py（Claude API） → write_bigquery.py（MERGEでUPSERT）
+  → categorize.py（Gemini API） → write_bigquery.py（MERGEでUPSERT）
   ← Cloud Scheduler → Cloud Functions（main.py）
 
 【可視化】
@@ -27,8 +27,8 @@ cp .env.example .env  # 値を編集
 ```
 
 `.env` の各変数の意味は `.env.example` を参照。カテゴライズには
-`ANTHROPIC_MODEL`（デフォルト `claude-haiku-4-5-20251001`）を使用する。
-分類タスクは単純なので Haiku で十分かつ低コスト。
+`GEMINI_MODEL`（デフォルト `gemini-2.5-flash`）を使用する。
+分類タスクは単純なので Flash で十分かつ低コスト。
 
 ### BigQuery テーブル作成
 
@@ -73,7 +73,7 @@ upsert_transactions(rows)
 
 ```bash
 export PROJECT_ID=your-gcp-project
-export ANTHROPIC_API_KEY=sk-ant-xxxx
+export GEMINI_API_KEY=AIzaSy-xxxx
 export MONEYFORWARD_EMAIL=you@example.com
 export MONEYFORWARD_PASSWORD=xxxx
 ./deploy/deploy.sh
@@ -117,7 +117,7 @@ scripts/categories.py         カテゴリ一覧（食費/交通/サブスク/�
 scripts/transaction_utils.py  重複排除用IDの生成・行データ組み立て
 scripts/import_csv.py         Amex CSV 初期投入（1回限り想定）
 scripts/fetch_moneyforward.py MoneyForward ME からの明細取得（非公式）
-scripts/categorize.py         Claude API によるカテゴライズ
+scripts/categorize.py         Gemini API によるカテゴライズ
 scripts/write_bigquery.py     BigQuery への UPSERT（MERGE）
 scripts/main.py               Cloud Functions エントリーポイント
 deploy/deploy.sh              GCPへのデプロイスクリプト
@@ -132,7 +132,7 @@ pip install pytest
 pytest tests/
 ```
 
-MoneyForward スクレイピングと BigQuery/Claude API 呼び出しは実サービスに
+MoneyForward スクレイピングと BigQuery/Gemini API 呼び出しは実サービスに
 依存するため自動テスト対象外。ユニットテストは純粋なロジック
 （重複排除キーの生成、MERGE クエリの組み立て）のみを検証する。
 
@@ -141,4 +141,4 @@ MoneyForward スクレイピングと BigQuery/Claude API 呼び出しは実サ�
 - MoneyForward の認証方式・CSV エクスポート URL は変更される可能性がある
   （`scripts/fetch_moneyforward.py` 参照）
 - MoneyForward 無料プランは連携4件まで・閲覧1年まで
-- Claude API のコストは明細数百行/月なら数円〜数十円程度
+- Gemini API のコストは明細数百行/月なら数円〜数十円程度

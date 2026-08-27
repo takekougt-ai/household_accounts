@@ -23,8 +23,8 @@ GCP_PROJECT_ID = os.environ.get("GCP_PROJECT_ID", "")
 BQ_DATASET = os.environ.get("BQ_DATASET", "household_accounts")
 BQ_TABLE = os.environ.get("BQ_TABLE", "amex_transactions")
 
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash")
 
 MONEYFORWARD_EMAIL = os.environ.get("MONEYFORWARD_EMAIL", "")
 MONEYFORWARD_PASSWORD = os.environ.get("MONEYFORWARD_PASSWORD", "")
