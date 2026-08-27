@@ -1,0 +1,9 @@
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.csv
+!tests/fixtures/*.csv
+.DS_Store
+*.egg-info/
