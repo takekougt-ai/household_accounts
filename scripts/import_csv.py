@@ -68,6 +68,10 @@ def main():
     df = parse_amex_csv(args.file)
     print(f"Parsed {len(df)} transactions from {args.file}")
 
+    if args.dry_run:
+        print(f"Dry run: would write {len(df)} rows. Sample merchants: {df['merchant_name'].head(3).tolist()}")
+        return
+
     merchant_names = df["merchant_name"].tolist()
     categories = categorize_batch(merchant_names)
 
@@ -81,10 +85,6 @@ def main():
         )
         for i, row in enumerate(df.itertuples(index=False))
     ]
-
-    if args.dry_run:
-        print(f"Dry run: would write {len(rows)} rows. Sample: {rows[:3]}")
-        return
 
     upsert_transactions(rows)
     print(f"Wrote {len(rows)} rows to BigQuery")
