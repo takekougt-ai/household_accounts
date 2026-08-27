@@ -25,8 +25,8 @@ from write_bigquery import upsert_transactions
 # Update the right-hand values if your export differs.
 COLUMN_MAP = {
     "date": "ご利用日",
-    "merchant": "ご利用店名・商品名",
-    "amount": "ご利用金額",
+    "merchant": "ご利用内容",
+    "amount": "金額",
 }
 
 # Amex Japan CSV exports are Shift-JIS (cp932) encoded.
