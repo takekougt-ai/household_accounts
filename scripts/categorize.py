@@ -63,10 +63,8 @@ def categorize_batch(merchant_names: List[str]) -> List[str]:
         chunk_categories = json.loads(response.text)
 
         if len(chunk_categories) < len(chunk):
-            raise ValueError(
-                f"Model returned {len(chunk_categories)} categories for {len(chunk)} merchants"
-            )
-        if len(chunk_categories) > len(chunk):
+            chunk_categories += ["その他"] * (len(chunk) - len(chunk_categories))
+        elif len(chunk_categories) > len(chunk):
             chunk_categories = chunk_categories[: len(chunk)]
 
         results.extend(chunk_categories)
