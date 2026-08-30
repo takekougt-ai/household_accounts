@@ -110,7 +110,7 @@ def _call_gemini(merchant_names: List[str]) -> List[str]:
                 )
                 break
             except genai_errors.ClientError as e:
-                if e.status_code == 429 and attempt < 3:
+                if "429" in str(e) and attempt < 3:
                     wait = 30 * (2 ** attempt)
                     print(f"Rate limited, retrying in {wait}s...")
                     time.sleep(wait)
