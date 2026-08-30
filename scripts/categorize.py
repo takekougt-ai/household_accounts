@@ -1,8 +1,12 @@
-"""Categorize merchant names into household-spending categories via Gemini."""
+"""Categorize merchant names into household-spending categories via Gemini.
+
+Rule-based pre-filtering handles ~80% of transactions locally; only
+unmatched names are sent to the Gemini API.
+"""
 
 import json
 import time
-from typing import List
+from typing import List, Optional
 
 from google import genai
 from google.genai import errors as genai_errors
@@ -34,17 +38,58 @@ _SYSTEM_INSTRUCTION = (
     "出力は入力と同じ順序・同じ件数のJSON配列にしてください。"
 )
 
-# Keep individual API calls small; a few hundred merchants per call stays
-# well under the model's output budget and keeps a single bad row from
-# invalidating a huge batch.
 _BATCH_SIZE = 200
 
+# Keyword rules applied before calling the API.
+# Checked in order; first match wins. Keywords are substring-matched.
+_RULES: list[tuple[list[str], str]] = [
+    # その他: payment method placeholders and card meta-charges
+    (["クイックペイプラス", "前回分口座振替", "年会費", "消費税", "決済手数料",
+      "楽天ペイ", "メルカリ"], "その他"),
+    # 交通
+    (["スマートＥＸ", "ＪＲ東日本", "ＪＲ東海", "ＪＲ西日本", "Ｓｕｉｃａ",
+      "えきねっと", "スカイライナー", "RYDE PASS", "RYDEPASS",
+      "バス", "タクシー", "飛鳥交通", "宝交通", "HUI CAR",
+      "CHARGESPOT", "EXIMBAY", "TMONEY"], "交通"),
+    # サブスク
+    (["Ｎｅｔｆｌｉｘ", "Netflix", "GOOGLE ONE", "GOOGLE *GOOGLE",
+      "Ａｐｐｌｅ　ｉＴｕｎｅｓ", "iTunes", "ソフトバンクＭ",
+      "ANTHROPIC", "CLAUDE", "DISNEY PLUS", "Disney Plus",
+      "ネイティブキャンプ", "TRANSATEL", "UBIGI",
+      "ちょこＺＡＰ", "chocoZAP", "STATION WORK", "テレキュ",
+      "ITX JAPAN"], "サブスク"),
+    # 食費: convenience stores, cafes, restaurants
+    (["ファミリーマート", "セブンイレブン", "ローソン", "デイリーヤマザキ",
+      "まいばすけっと", "マルエツ", "スターバックス", "マクドナルド",
+      "すき家", "松屋", "吉野家", "タリーズ", "ドトール", "バーガーキング",
+      "UBER EATS", "UBEREATS", "UBERDIRECT", "DOMINO", "ドミノ",
+      "社食", "モンスーン", "ジョナサン", "ＨＵＢ", "笑笑", "和民",
+      "うどん", "ラーメン", "焼肉", "居酒屋", "食堂", "レストラン",
+      "ビストロ", "コーヒー", "COFFEE", "カフェ", "コカ・コーラ",
+      "breadworks", "AMAMERIA", "一番どり", "壱角家", "らぁ麺",
+      "おにやんま", "カレー", "やきとり", "飲食"], "食費"),
+    # 日用品
+    (["マツモトキヨシ", "ドン　キホーテ", "ドンキホーテ", "薬局",
+      "クリーニング", "ドラッグ"], "日用品"),
+    # 交際費
+    (["カラオケ", "野球場", "ディズニー", "Disney", "ライブ",
+      "ドームショップ", "下北沢ＥＲＡ"], "交際費"),
+    # 旅行
+    (["ホテル", "HOTEL", "RESORT", "リゾート", "Ｔｒｉｐ．ｃｏｍ",
+      "Trip.com", "空港", "AIRPORT"], "旅行"),
+]
 
-def categorize_batch(merchant_names: List[str]) -> List[str]:
-    """Return one category from CATEGORIES for each merchant name, in order."""
-    if not merchant_names:
-        return []
 
+def _rule_categorize(name: str) -> Optional[str]:
+    """Return a category by keyword rule, or None if no rule matches."""
+    for keywords, category in _RULES:
+        if any(kw in name for kw in keywords):
+            return category
+    return None
+
+
+def _call_gemini(merchant_names: List[str]) -> List[str]:
+    """Call Gemini API to categorize a list of merchant names."""
     results: List[str] = []
     client = _get_client()
 
@@ -82,3 +127,27 @@ def categorize_batch(merchant_names: List[str]) -> List[str]:
         results.extend(chunk_categories)
 
     return results
+
+
+def categorize_batch(merchant_names: List[str]) -> List[str]:
+    """Return one category from CATEGORIES for each merchant name, in order.
+
+    Applies keyword rules first; only unmatched names are sent to Gemini.
+    """
+    if not merchant_names:
+        return []
+
+    rule_results = [_rule_categorize(name) for name in merchant_names]
+
+    gemini_indices = [i for i, cat in enumerate(rule_results) if cat is None]
+    rule_count = len(merchant_names) - len(gemini_indices)
+    print(f"Rules matched {rule_count}/{len(merchant_names)} merchants; "
+          f"sending {len(gemini_indices)} to Gemini")
+
+    if gemini_indices:
+        gemini_names = [merchant_names[i] for i in gemini_indices]
+        gemini_cats = _call_gemini(gemini_names)
+        for idx, cat in zip(gemini_indices, gemini_cats):
+            rule_results[idx] = cat
+
+    return rule_results  # type: ignore[return-value]
