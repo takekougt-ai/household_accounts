@@ -1,9 +1,11 @@
 """Categorize merchant names into household-spending categories via Gemini."""
 
 import json
+import time
 from typing import List
 
 from google import genai
+from google.genai import errors as genai_errors
 from google.genai import types
 
 from categories import CATEGORIES
@@ -50,15 +52,25 @@ def categorize_batch(merchant_names: List[str]) -> List[str]:
         chunk = merchant_names[start : start + _BATCH_SIZE]
         numbered = "\n".join(f"{i + 1}. {name}" for i, name in enumerate(chunk))
 
-        response = client.models.generate_content(
-            model=GEMINI_MODEL,
-            contents=numbered,
-            config=types.GenerateContentConfig(
-                system_instruction=_SYSTEM_INSTRUCTION,
-                response_mime_type="application/json",
-                response_schema=_RESPONSE_SCHEMA,
-            ),
-        )
+        for attempt in range(4):
+            try:
+                response = client.models.generate_content(
+                    model=GEMINI_MODEL,
+                    contents=numbered,
+                    config=types.GenerateContentConfig(
+                        system_instruction=_SYSTEM_INSTRUCTION,
+                        response_mime_type="application/json",
+                        response_schema=_RESPONSE_SCHEMA,
+                    ),
+                )
+                break
+            except genai_errors.ClientError as e:
+                if e.status_code == 429 and attempt < 3:
+                    wait = 30 * (2 ** attempt)
+                    print(f"Rate limited, retrying in {wait}s...")
+                    time.sleep(wait)
+                else:
+                    raise
 
         chunk_categories = json.loads(response.text)
 
